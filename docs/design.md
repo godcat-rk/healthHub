@@ -5,6 +5,30 @@
 - 初期コストを抑えつつ、将来的なマルチユーザ拡張に対応できる道筋を確保する。
 - 初期段階から観測性・設定管理・テスト体制を整えた構成とする。
 
+## ブランチ戦略（GitHub Flow）
+
+**ブランチ構成**:
+- `main`: 本番環境・安定版。常にデプロイ可能な状態を維持
+- `feature/phaseX-xxx`: フェーズごとの開発用ブランチ
+
+**開発フロー**:
+1. 新しいフェーズ開始時に`main`から`feature/phaseX-xxx`ブランチを作成
+2. 開発・テスト・コミットを繰り返す
+3. フェーズ完了後、Pull Requestを作成
+4. レビュー・動作確認後、`main`にマージ
+5. マージ後、featureブランチは削除
+
+**ブランチ命名規則**:
+- `feature/phase2-api-integration` - API統合機能
+- `feature/phase3-data-validation` - データ検証機能
+- `feature/phase4-database-setup` - データベース構築
+- `feature/phaseX-description` - その他の機能
+
+**メリット**:
+- フェーズごとの変更履歴が明確
+- 問題発生時に簡単にロールバック可能
+- Pull Requestで変更内容をレビュー可能
+
 ## ロードマップ
 1. **フェーズ0: 前提整備（1日）**
    - Oura Personal Access Token（PAT）を取得・共有してもらう。
