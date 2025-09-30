@@ -1,0 +1,88 @@
+[project]
+name = "healthhub-batch"
+version = "0.1.0"
+description = "Oura Ring data batch processing system"
+authors = [
+    {name = "healthhub team"}
+]
+readme = "README.md"
+requires-python = "^3.11"
+dependencies = [
+    "httpx (>=0.28.1,<0.29.0)",
+    "pydantic (>=2.11.9,<3.0.0)",
+    "sqlalchemy[asyncpg] (>=2.0.43,<3.0.0)",
+    "pydantic-settings (>=2.11.0,<3.0.0)",
+    "typer (>=0.19.2,<0.20.0)",
+    "structlog (>=25.4.0,<26.0.0)",
+    "alembic (>=1.16.5,<2.0.0)"
+]
+
+[project.scripts]
+healthhub-batch = "healthhub_batch.cli:main"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=8.4.2,<9.0.0)",
+    "pytest-asyncio (>=1.2.0,<2.0.0)",
+    "ruff (>=0.13.2,<0.14.0)",
+    "mypy (>=1.18.2,<2.0.0)",
+    "black (>=25.9.0,<26.0.0)"
+]
+
+# Ruff configuration
+[tool.ruff]
+target-version = "py311"
+src = ["src"]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["healthhub_batch"]
+
+# Black configuration
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--disable-warnings",
+]
+asyncio_mode = "auto"
