@@ -60,7 +60,7 @@
 6. **フェーズ5: バッチ本実装（4〜5日）**
    - CLI から日付範囲を受け取って API → 変換 → Supabase/PostgreSQL 永続化までを実行するパイプラインを構築。
    - cron 相当の GitHub Actions ワークフローを用意し、Secrets から PAT・DB 接続情報を取得。
-   - INFO/ERROR ログと Slack 通知（Webhook）を組み込み、テストで動作確認。
+   - INFO/ERROR ログと LINE Messaging API 通知を組み込み、テストで動作確認。
 
 7. **フェーズ6: テスト強化と運用準備（2日）**
    - ユニットテスト・統合テストを充実させ、VCR.py／`respx` で API モックを安定化。
@@ -114,7 +114,7 @@
 ### 観測性とアラート
 - 各 API 呼び出し（エンドポイント、期間、リクエスト ID）を INFO ログに、失敗時はスタックトレース付きで ERROR ログに出力。
 - ログは JSON 形式とし、GitHub Actions のログ／将来的なクラウドログ基盤への転送に備える。
-- リトライ上限を超えた致命的失敗時は Slack Webhook（Secrets に URL を保存）で通知。
+- リトライ上限を超えた致命的失敗時は LINE Messaging API（Secrets にアクセストークンを保存）で通知。
 - Supabase 側のメトリクスはダッシュボードで確認し、必要に応じてクエリパフォーマンスを監視。
 
 ### テスト戦略
@@ -130,9 +130,9 @@
 ### バッチ運用フロー（GitHub Actions + Supabase）
 1. `schedule` トリガー（例: 毎日 06:00 JST）でワークフローを起動。
 2. `actions/checkout` → Poetry キャッシュ復元 → 依存をインストール。
-3. Secrets から `OURA_PAT`, `SUPABASE_DB_URL`, `SUPABASE_SERVICE_ROLE_KEY` を取得し、環境変数にエクスポート。
+3. Secrets から `OURA_PAT`, `SUPABASE_DB_URL`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_USER_ID` を取得し、環境変数にエクスポート。
 4. Python CLI を `--start-date` `--end-date` 付きで実行し、Supabase の PostgreSQL に対して upsert。
-5. 結果ログを標準出力で確認し、失敗時は Slack 通知。成功時は Supabase 上にデータが蓄積。
+5. 結果ログを標準出力で確認し、失敗時は LINE 通知。成功時は Supabase 上にデータが蓄積。
 6. 必要に応じて Supabase の自動バックアップ（無料枠の 7 日分）を確認し、重要な節目ではダンプをローカルへ取得。
 
 ### 将来の検討事項

@@ -33,9 +33,13 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level")
 
     # Notification settings
-    slack_webhook_url: str = Field(
+    line_channel_access_token: str = Field(
         default="",
-        description="Slack webhook URL for notifications (optional)",
+        description="LINE Messaging API Channel Access Token (optional)",
+    )
+    line_user_id: str = Field(
+        default="",
+        description="LINE User ID for notifications (optional)",
     )
 
     # Application settings

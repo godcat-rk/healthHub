@@ -90,11 +90,12 @@ poetry add --group dev package_name  # 開発用依存関係追加
 ```bash
 # 必須
 OURA_PAT=your_oura_personal_access_token
-SUPABASE_DB_URL=postgresql://postgres:password@host:port/database
+SUPABASE_DB_URL=postgresql://postgres.project_ref:password@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres
 
 # オプション
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-SLACK_WEBHOOK_URL=your_slack_webhook_url
+LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token
+LINE_USER_ID=your_line_user_id
 LOG_LEVEL=INFO
 USER_ID=00000000-0000-0000-0000-000000000000
 TIMEZONE=UTC
