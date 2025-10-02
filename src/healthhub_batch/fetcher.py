@@ -1,18 +1,28 @@
 # src/healthhub_batch/fetcher.py
-# Oura APIからデータを取得するメインロジック
-# 複数エンドポイントを並列で取得し、結果をログ出力
-# RELEVANT FILES: oura_client.py, cli.py, config.py
+# Oura APIからデータを取得し、データベースに保存するメインロジック
+# 複数エンドポイントを並列で取得し、Pydanticモデルでパース、Repositoryで保存
+# RELEVANT FILES: oura_client.py, cli.py, repository.py, models.py
 
 """Data fetching orchestration for Oura Ring API."""
 from __future__ import annotations
 
 import asyncio
 from typing import Any
+from uuid import UUID
 
 import structlog
 
 from healthhub_batch.config import Settings
+from healthhub_batch.database import Database
+from healthhub_batch.models import (
+    DailyActivity,
+    DailyReadiness,
+    DailyResilience,
+    DailySleep,
+    DailyStress,
+)
 from healthhub_batch.oura_client import OuraClient
+from healthhub_batch.repository import HealthDataRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -20,7 +30,7 @@ logger = structlog.get_logger(__name__)
 async def fetch_all_data(
     start_date: str, end_date: str, settings: Settings
 ) -> dict[str, Any]:
-    """Fetch all daily summaries from Oura API.
+    """Fetch all daily summaries from Oura API (raw response).
 
     Args:
         start_date: Start date (YYYY-MM-DD)
@@ -65,6 +75,111 @@ async def fetch_all_data(
     return results
 
 
+async def fetch_and_save_data(
+    start_date: str, end_date: str, settings: Settings, db: Database
+) -> dict[str, int]:
+    """
+    Oura APIからデータを取得し、データベースに保存
+
+    Args:
+        start_date: 開始日 (YYYY-MM-DD)
+        end_date: 終了日 (YYYY-MM-DD)
+        settings: アプリケーション設定
+        db: データベースインスタンス
+
+    Returns:
+        エンドポイントごとの保存件数
+    """
+    # USER_IDの取得
+    user_id = UUID(settings.user_id)
+    logger.info("fetch_and_save_started", user_id=str(user_id))
+
+    # APIからデータ取得
+    raw_data = await fetch_all_data(start_date, end_date, settings)
+
+    # Pydanticモデルでパース
+    parsed_data = {
+        "sleep": [],
+        "activity": [],
+        "readiness": [],
+        "stress": [],
+        "resilience": [],
+    }
+
+    # Sleep
+    if "daily_sleep" in raw_data and "data" in raw_data["daily_sleep"]:
+        try:
+            parsed_data["sleep"] = [
+                DailySleep(**item) for item in raw_data["daily_sleep"]["data"]
+            ]
+            logger.info("sleep_parsed", count=len(parsed_data["sleep"]))
+        except Exception as e:
+            logger.error("sleep_parse_error", error=str(e))
+
+    # Activity
+    if "daily_activity" in raw_data and "data" in raw_data["daily_activity"]:
+        try:
+            parsed_data["activity"] = [
+                DailyActivity(**item) for item in raw_data["daily_activity"]["data"]
+            ]
+            logger.info("activity_parsed", count=len(parsed_data["activity"]))
+        except Exception as e:
+            logger.error("activity_parse_error", error=str(e))
+
+    # Readiness
+    if "daily_readiness" in raw_data and "data" in raw_data["daily_readiness"]:
+        try:
+            parsed_data["readiness"] = [
+                DailyReadiness(**item) for item in raw_data["daily_readiness"]["data"]
+            ]
+            logger.info("readiness_parsed", count=len(parsed_data["readiness"]))
+        except Exception as e:
+            logger.error("readiness_parse_error", error=str(e))
+
+    # Stress
+    if "daily_stress" in raw_data and "data" in raw_data["daily_stress"]:
+        try:
+            parsed_data["stress"] = [
+                DailyStress(**item) for item in raw_data["daily_stress"]["data"]
+            ]
+            logger.info("stress_parsed", count=len(parsed_data["stress"]))
+        except Exception as e:
+            logger.error("stress_parse_error", error=str(e))
+
+    # Resilience
+    if "daily_resilience" in raw_data and "data" in raw_data["daily_resilience"]:
+        try:
+            parsed_data["resilience"] = [
+                DailyResilience(**item) for item in raw_data["daily_resilience"]["data"]
+            ]
+            logger.info("resilience_parsed", count=len(parsed_data["resilience"]))
+        except Exception as e:
+            logger.error("resilience_parse_error", error=str(e))
+
+    # データベースに保存
+    save_counts = {}
+    try:
+        async with db.session() as session:
+            repo = HealthDataRepository(session, user_id)
+
+            save_counts["sleep"] = await repo.upsert_sleep_data(parsed_data["sleep"])
+            save_counts["activity"] = await repo.upsert_activity_data(
+                parsed_data["activity"]
+            )
+            save_counts["readiness"] = await repo.upsert_readiness_data(
+                parsed_data["readiness"]
+            )
+            save_counts["stress"] = await repo.upsert_stress_data(parsed_data["stress"])
+            save_counts["resilience"] = await repo.upsert_resilience_data(
+                parsed_data["resilience"]
+            )
+
+        logger.info("fetch_and_save_completed", save_counts=save_counts)
+        return save_counts
+    finally:
+        await db.close()
+
+
 def print_summary(results: dict[str, Any]) -> None:
     """Print a summary of fetched data.
 
@@ -74,10 +189,10 @@ def print_summary(results: dict[str, Any]) -> None:
     print("\n=== Oura API Fetch Summary ===")
     for endpoint, data in results.items():
         if "error" in data:
-            print(f"❌ {endpoint}: ERROR - {data['error']}")
+            print(f"[ERROR] {endpoint}: ERROR - {data['error']}")
         else:
             records = data.get("data", [])
-            print(f"✅ {endpoint}: {len(records)} records")
+            print(f"[OK] {endpoint}: {len(records)} records")
 
             # サンプルデータを表示
             if records:

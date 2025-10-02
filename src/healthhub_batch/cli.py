@@ -13,7 +13,8 @@ import typer
 from typing_extensions import Annotated
 
 from healthhub_batch.config import Settings
-from healthhub_batch.fetcher import fetch_all_data, print_summary
+from healthhub_batch.database import init_database
+from healthhub_batch.fetcher import fetch_all_data, fetch_and_save_data, print_summary
 
 # structlogの設定
 structlog.configure(
@@ -42,20 +43,32 @@ def fetch(
         settings = Settings()
         settings.validate_required_secrets()
     except ValueError as e:
-        typer.echo(f"❌ Configuration error: {e}", err=True)
+        typer.echo(f"[ERROR] Configuration error: {e}", err=True)
         raise typer.Exit(code=1) from e
 
-    typer.echo(f"🔄 Fetching Oura data from {start_date} to {end_date}")
+    typer.echo(f"[INFO] Fetching Oura data from {start_date} to {end_date}")
+
     if dry_run:
-        typer.echo("ℹ️  Dry run mode: データベースには保存しません")
+        # Dry runモード：APIからデータ取得のみ（DB保存なし）
+        typer.echo("[INFO] Dry run mode: データベースには保存しません")
+        results = asyncio.run(fetch_all_data(start_date, end_date, settings))
+        print_summary(results)
+    else:
+        # 通常モード：データ取得 + DB保存
+        typer.echo("[INFO] Saving data to database...")
+        db = init_database(settings)
 
-    # 非同期処理を実行
-    results = asyncio.run(fetch_all_data(start_date, end_date, settings))
+        save_counts = asyncio.run(
+            fetch_and_save_data(start_date, end_date, settings, db)
+        )
 
-    # 結果を表示
-    print_summary(results)
+        # 保存結果を表示
+        typer.echo("\n=== Save Summary ===")
+        for data_type, count in save_counts.items():
+            typer.echo(f"[OK] {data_type}: {count} records saved")
+        typer.echo("=" * 30 + "\n")
 
-    typer.echo("✅ Data fetching completed")
+    typer.echo("[OK] Data fetching completed")
 
 
 @app.command()
@@ -63,7 +76,7 @@ def migrate() -> None:
     """Run database migrations."""
     typer.echo("Running database migrations...")
     # TODO: Implement migration logic
-    typer.echo("✅ Database migrations completed (placeholder)")
+    typer.echo("[OK] Database migrations completed (placeholder)")
 
 
 @app.command()
